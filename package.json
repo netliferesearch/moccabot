@@ -1,19 +1,24 @@
 {
   "name": "moccabot",
-  "version": "0.0.0",
-  "description": "Tessel project",
+  "version": "0.0.2",
+  "description": "Moccabot - Keeps track of your coffee brewing",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "lint": "standard"
   },
-  "repository": "www.github.com/tessel/t2-cli",
+  "repository": "www.github.com/netliferesearch/moccabot",
   "keywords": [
-    "Tessel"
+    "Tessel",
+    "MoccaMaster",
+    "Coffee"
   ],
   "license": "MIT",
-  "readme": "A bare bones Tessel 2 blinky script.",
+  "devDependencies": {
+    "eslint-config-standard": "^6.2.1",
+    "eslint-plugin-promise": "^3.4.0",
+    "eslint-plugin-standard": "^2.0.1"
+  },
   "dependencies": {
-    "barcli": "^0.0.23",
     "dotenv": "^2.0.0",
     "johnny-five": "^0.10.6",
     "slackbots": "^1.0.2",
