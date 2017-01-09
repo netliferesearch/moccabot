@@ -18,6 +18,8 @@ var messages = botConfig.messages
 var user = botConfig.user
 var params = botConfig.params
 var thresholdTemp = botConfig.thresholdTemp
+var channel = botConfig.channel
+var group = botConfig.group
 
 function botStartUp () {
   bot.on('start', function () {
@@ -36,7 +38,15 @@ function printToLCD (string, temp) {
   lcd.autoscroll().print(string).print(' ' + temp + ' grader')
 }
 function postToSlack (message) {
-  bot.postMessageToUser(user, message, params)
+  if (user) {
+    bot.postMessageToUser(user, message, params)
+  }
+  if (channel) {
+    bot.postMessageToChannel(channel, message, params)
+  }
+  if (group) {
+    bot.postMessageToGroup(group, message, params)
+  }
 }
 
 board.on('ready', function () {
