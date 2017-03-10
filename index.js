@@ -23,9 +23,7 @@ var channel = botConfig.channel
 var group = botConfig.group
 var startTemp = messages.startTemp
 var doneTemp = messages.doneTemp
-var lcd = new five.LCD({
-    pins: ['b2', 'b3', 'b4', 'b5', 'b6', 'b7']
-  })
+
 
 function botStartUp () {
   bot.on('start', function () {
@@ -33,14 +31,16 @@ function botStartUp () {
   })
 }
 
-function printToLCD (string, temp) {
-  string = string || 'Ready'
-  /**
-   * Set up the LCD Screen (on port B)
-   * */
-  lcd.clear()
-  lcd.cursor(0, 0).print(string)
-  lcd.cursor(1, 0).print(temp + ' ' + startTemp)
+function postToSlack (message) {
+  if (user) {
+    bot.postMessageToUser(user, message, params)
+  }
+  if (channel) {
+    bot.postMessageToChannel(channel, message, params)
+  }
+  if (group) {
+    bot.postMessageToGroup(group, message, params)
+  }
 }
 
 board.on('ready', function () {
