@@ -1,6 +1,7 @@
 /**
  * Set up the Board
  */
+var fs = require('fs')
 
 var five = require('johnny-five')
 var Tessel = require('tessel-io')
@@ -20,33 +21,26 @@ var params = botConfig.params
 var thresholdTemp = botConfig.thresholdTemp
 var channel = botConfig.channel
 var group = botConfig.group
+var startTemp = messages.startTemp
+var doneTemp = messages.doneTemp
+var lcd = new five.LCD({
+    pins: ['b2', 'b3', 'b4', 'b5', 'b6', 'b7']
+  })
 
 function botStartUp () {
   bot.on('start', function () {
-    bot.postMessageToUser(user, messages.ready, params)
+    bot.postMessageToGroup(group, messages.ready, params)
   })
 }
 
 function printToLCD (string, temp) {
-  string = string || 'Klar'
+  string = string || 'Ready'
   /**
    * Set up the LCD Screen (on port B)
    * */
-  var lcd = new five.LCD({
-    pins: ['b2', 'b3', 'b4', 'b5', 'b6', 'b7']
-  })
-  lcd.autoscroll().print(string).print(' ' + temp + ' grader')
-}
-function postToSlack (message) {
-  if (user) {
-    bot.postMessageToUser(user, message, params)
-  }
-  if (channel) {
-    bot.postMessageToChannel(channel, message, params)
-  }
-  if (group) {
-    bot.postMessageToGroup(group, message, params)
-  }
+  lcd.clear()
+  lcd.cursor(0, 0).print(string)
+  lcd.cursor(1, 0).print(temp + ' ' + startTemp)
 }
 
 board.on('ready', function () {
@@ -61,29 +55,44 @@ board.on('ready', function () {
    * Set the initial brewing state and start up
    */
   var brewing = false
+  var doneState = false
+  var coolDown = false
   botStartUp()
 
   /**
    * Temperature logic
    */
   multi.on('data', function () {
-    printToLCD(messages.ready, temp)
+    function isFinishedBrewing() {
+      return temp > doneTemp && brewing
+    }
+    function isBrewing() {
+      return temp > startTemp && temp < doneTemp && !coolDown
+    }
+    
     var temp = this.thermometer.celsius
-    if (temp > thresholdTemp && !brewing) {
+    var log = temp + ', ' + this.hygrometer.relativeHumidity + ', ' + new Date()
+    
+
+    if (isBrewing()) {
       brewing = true
-      printToLCD(messages.brewing, temp)
-      postToSlack(messages.brewingSlack)
+      bot.postMessageToGroup(group, messages.brewingSlack, params)
     }
-    if (temp > thresholdTemp && brewing) {
-      printToLCD(messages.brewing, temp)
+    if (isFinishedBrewing()) {
+        brewing = false
+        coolDown = true        
+        bot.postMessageToGroup(group, messages.done, params)
+        setTimout(function() {
+          coolDown = false
+        }, 6e5)
     }
-    if (temp < thresholdTemp && brewing) {
-      brewing = false
-      printToLCD(messages.done, temp)
-      postToSlack(messages.done)
-    }
+    setTimeout(function() {
+      console.log(log)
+    }, 1500)
+    /*
     if (temp < thresholdTemp && !brewing) {
       setTimeout(printToLCD(messages.ready, temp), 5000)
     }
+    */
   })
 })
