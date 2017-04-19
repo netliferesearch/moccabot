@@ -1,16 +1,7 @@
-var regression = require('regression');
-
-var data = require('./data.json');
-var lessData = data.filter((line, i) => i % 100 === 0);
-
-var dataSeries = lessData.map((line, index) => ([
-    index, // (new Date(line[2])).getTime(),
-    line[0]
-]))
-
 /**
  * Set up the Board
  */
+var temporal = require('temporal')
 
 var five = require('johnny-five')
 var Tessel = require('tessel-io')
@@ -22,27 +13,73 @@ var board = new five.Board({
 /**
  * Set up Slackbot and fetch the config
  */
-var bot = require('./bot')
+// var bot = require('./bot')
 var botConfig = require('./botconfig')
-var messages = botConfig.messages
+var messages = {
+  ready: botConfig.messageReady(),
+  brewingSlack: botConfig.messageBrewingSlack,
+  brewing: botConfig.messageBrewing,
+  done: botConfig.messageDone
+}
 var user = botConfig.user
 var params = botConfig.params
-var thresholdTemp = botConfig.thresholdTemp
+var startTemp = botConfig.startTemp
+var brewingTime = botConfig.brewingTime
 var channel = botConfig.channel
 var group = botConfig.group
 
-function botStartUp () {
-  bot.on('start', function () {
-    console.log(user, messages.ready, params)
+board.on('ready', function () {
+  console.log('Board is ready')
+  var multi = new five.Multi({
+    controller: 'BME280'
   })
-}
-
-function printToLCD (string, temp) {
-  string = string || 'Klar'
   /**
-   * Set up the LCD Screen (on port B)
-   * */
-  console.log(string, temp)
+   * Set the initial brewing state and start up
+   */
+  var brewing = false
+  var sentReadyMessage = false
+
+  botStartUp()
+
+  /**
+   * Temperature logic
+   */
+  multi.on('ready', function () {
+    console.log('thermometer is ready')
+  })
+
+  multi.on('data', function () {
+    var temp = this.thermometer.celsius
+    if (temp > startTemp && !brewing) {
+      brewing = true
+      log(messages.brewing, temp)
+      // postToSlack(messages.brewingSlack)
+      // it takes N minutes on a full pot to final drop
+      temporal.delay(brewingTime, function () {
+        brewing = false
+        sentReadyMessage = false
+        log(messages.done, temp)
+        postToSlack(messages.done)
+      })
+    }
+    if (temp > startTemp && brewing && sentReadyMessage) {
+      temporal.loop(3000, function () {
+        log(messages.brewing, temp)
+      })
+    }
+    if (temp < startTemp && !brewing && !sentReadyMessage) {
+      log(messages.ready, temp)
+      sentReadyMessage = true
+    }
+  })
+
+  multi.on('error', function (error) {
+    console.log('there was an error', error)
+  })
+})
+
+function log (message, temp) {
+  console.log(message, temp)
 }
 
 function postToSlack (message) {
@@ -58,71 +95,7 @@ function postToSlack (message) {
 }
 
 
-// regression('linear', dataSeries)
+function botStartUp () {
+  postToSlack(user, messages.ready, params)
+}
 
-/*
-dataSeries.forEach((line, i) => {
-    if (i < 50) {
-        return;
-    }
-
-    console.log([].concat(
-        line,
-        regression('linear', dataSeries.slice(i - 10, i)).equation[0] > 0.0075
-    ));
-*/
-
-board.on('ready', function () {
-  var multi = new five.Multi({
-    controller: 'BME280'
-  })
-  var led = new five.Led('B0')
-  led.blink(500)
-  /**
-   * Set the initial brewing state and start up
-   */
-  var brewing = false
-  botStartUp()
-
-  /**
-   * Temperature logic
-   */
-  multi.on('data', function () {
-    printToLCD(messages.ready, temp)
-    var temp = this.thermometer.celsius
-    setTimeout(printToLCD(messages.ready, temp), 1000)
-    if (temp > thresholdTemp && !brewing) {
-      brewing = true
-      printToLCD(messages.brewing, temp)
-      postToSlack(messages.brewingSlack)
-    }
-    if (temp > thresholdTemp && brewing) {
-      printToLCD(messages.brewing, temp)
-    }
-    if (temp < thresholdTemp && brewing) {
-      brewing = false
-      printToLCD(messages.done, temp)
-      postToSlack(messages.done)
-    }
-    if (temp < thresholdTemp && !brewing) {
-      setTimeout(printToLCD(messages.ready, temp), 5000)
-    }
-  })
-})
-
-// lessData.forEach((line, i) => {
-//     console.log(i)
-
-//     console.log(lessData.slice(i, Math.max(i - 50, 0)).map(l => [
-//         new Date(l[2]).getTime(),
-//         l[0]
-//     ]))
-
-//     // console.log(regression(
-//     //     'linear',
-//     //     lessData.slice(i, Math.max(i - 50, 0)).map(l => [
-//     //         new Date(l[2]).getTime(),
-//     //         l[0]
-//     //     ])
-//     // ))
-// })
